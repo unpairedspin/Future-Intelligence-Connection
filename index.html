@@ -200,7 +200,7 @@ function updateHome() {
   let completed = 0;
   try { const data = JSON.parse(localStorage.getItem(PROGRESS_KEY + '-' + key) || 'null'); completed = pool().filter(q => Object.hasOwn(data?.done || {},q.id)).length; } catch (_) {}
   $('scopeSummary').textContent = count ? $('order').value === 'ordered' ? `${count}문항 · 순서대로 풀기 · 완료 ${completed}문항` : `${count}문항 · 문제와 선택지 무작위` : '아직 오답이 없습니다. 전체 또는 주차별 문제를 풀어보세요.';
-  if (easy) $('scopeSummary').textContent = easyError || ($('mode').value === 'easy' ? `새 문제은행 ${easyBank.length}문항 · 30개 키워드에서 각 1문항 · 매회 무작위 추출. 키워드별 미학습 문항을 우선하고, 소진된 키워드는 다시 순환합니다. 실제 시험의 키워드별 출제 수를 예측하는 구성이 아닙니다.` : $('mode').value === 'easyAll' ? `${count}문항 전체 · 한 번씩 출제 · 문제와 선택지 무작위` : `${count}문항 · 교수님 예시 난이도 오답 복습 · 무작위`);
+  if (easy) $('scopeSummary').textContent = easyError || ($('mode').value === 'easy' ? `새 문제은행 ${easyBank.length}문항 · 30개 키워드에서 각 1문항 · 매회 무작위 추출. 키워드별 미학습 문항을 우선하고, 소진된 키워드는 다시 순환합니다. 실제 시험의 키워드별 출제 수를 예측하는 구성이 아닙니다.` : $('mode').value === 'easyAll' ? `${count}문항 전체 · 키워드 순서대로 · 선택지 무작위` : `${count}문항 · 교수님 예시 난이도 오답 복습 · 무작위`);
   const selectedWrong = easy ? easyWrong : wrong;
   $('wrongCount').textContent = `${easy ? '교수님 예시' : '기존 문제은행'} 남은 오답 ${selectedWrong.size}문항`;
   $('start').disabled = count === 0;
@@ -215,7 +215,7 @@ function startSession() {
   usingEasy = selectedEasy();
   if (usingEasy && easyError) return;
   ordered = !usingEasy && $('order').value === 'ordered';
-  session = $('mode').value === 'easy' ? sampleEasyRound() : ordered ? pool() : shuffle(pool());
+  session = $('mode').value === 'easy' ? sampleEasyRound() : $('mode').value === 'easyAll' ? [...pool()].sort((a,b) => a.keyword.localeCompare(b.keyword, 'en', {numeric:true}) || a.id.localeCompare(b.id, 'en', {numeric:true})) : ordered ? pool() : shuffle(pool());
   if (!session.length) return;
   isStudy = $('studyMode').value === 'study';
   sessionLabel = $('mode').value === 'all' ? '전체 문제' : $('mode').value === 'wrong' ? '오답 복습' : `${$('week').value}주차`;
