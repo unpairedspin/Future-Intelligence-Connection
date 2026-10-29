@@ -55,7 +55,7 @@
 <section id="home" class="card">
 <p class="intro">문제를 풀고, 틀린 내용만 다시 확인하세요.<br><span id="bankSummary" class="muted small"></span></p>
 <div class="form-row">
-<label class="field">학습 범위<select id="mode"><option value="all">전체 문제 풀기</option><option value="week">특정 주차 문제 풀기</option><option value="wrong">오답만 풀기</option></select></label>
+<label class="field">학습 범위<select id="mode"><option value="all">전체 문제 풀기</option><option value="week">특정 주차 문제 풀기</option><option value="wrong">오답만 풀기</option><option value="easy">교수님 예시 난이도 · 30문항</option><option value="easyWrong">교수님 예시 난이도 · 오답 복습</option></select></label>
 <label id="weekField" class="field" hidden>주차<select id="week"><option value="2">2주차</option><option value="3">3주차</option><option value="4">4주차</option><option value="5">5주차</option><option value="6">6주차</option><option value="7">7주차</option></select></label>
 </div>
 <label class="field">진행 방식<select id="studyMode"><option value="quiz">문제 풀이</option><option value="study">학습 모드</option></select></label>
@@ -64,7 +64,7 @@
 <button id="start" class="primary" style="width:100%" disabled>학습 시작</button>
 <div class="actions"><span id="wrongCount" class="small muted"></span><button id="reset" class="text-button" disabled>오답 기록 초기화</button></div>
 <button id="resetProgress" class="text-button" type="button">풀이 기록 초기화</button>
-<details><summary>사용 방법과 기록 안내</summary><p>문제 풀이에서는 답을 고른 뒤 <strong>정답 확인</strong>으로 채점합니다. 학습 모드는 선택 없이도 정답과 선택지별 해설을 볼 수 있고 오답 기록을 바꾸지 않습니다. 순서대로 풀기는 범위와 진행 방식별 위치·풀이 결과를 저장하며 문항 이동이 가능합니다. 무작위로 풀기는 시작할 때 문제와 선택지를 섞습니다.</p><p>틀린 문제는 오답에 남고 다시 맞히면 제거됩니다. 오답 기록과 순서대로 풀기의 진도는 현재 브라우저에 저장됩니다. 비공개 모드·브라우저 데이터 삭제 시 기록이 사라질 수 있습니다.</p><p>오프라인 사용: 압축을 풀고 index.html과 questions.js를 같은 폴더에 둔 뒤 index.html을 브라우저로 여세요. PDF 보기에는 함께 제공된 materials 폴더를 사용합니다. 파일 위치나 브라우저가 바뀌면 기록이 이어지지 않을 수 있습니다.</p></details>
+<details><summary>사용 방법과 기록 안내</summary><p>문제 풀이에서는 답을 고른 뒤 <strong>정답 확인</strong>으로 채점합니다. 학습 모드는 선택 없이도 정답과 선택지별 해설을 볼 수 있고 오답 기록을 바꾸지 않습니다. 순서대로 풀기는 범위와 진행 방식별 위치·풀이 결과를 저장하며 문항 이동이 가능합니다. 무작위로 풀기는 시작할 때 문제와 선택지를 섞습니다.</p><p>틀린 문제는 오답에 남고 다시 맞히면 제거됩니다. 오답 기록과 순서대로 풀기의 진도는 현재 브라우저에 저장됩니다. 비공개 모드·브라우저 데이터 삭제 시 기록이 사라질 수 있습니다.</p><p>오프라인 사용: 압축을 풀고 index.html과 questions.js를 같은 폴더에 둔 뒤 index.html을 브라우저로 여세요. 교수님 예시 난이도에는 easy_questions.js도 같은 폴더에 두세요. PDF 보기에는 함께 제공된 materials 폴더를 사용합니다. 파일 위치나 브라우저가 바뀌면 기록이 이어지지 않을 수 있습니다.</p></details>
 </section>
 <section id="quiz" class="card" hidden>
 <div class="session-top"><span id="position"></span><span id="score"></span></div>
@@ -81,11 +81,18 @@
 <noscript><p class="notice">문제를 풀려면 브라우저의 JavaScript를 허용해 주세요.</p></noscript>
 </main>
 <script src="questions.js"></script>
+<script src="easy_questions.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'future-intelligence-cbt-wrong-v1';
 const PROGRESS_KEY = 'future-intelligence-cbt-progress-v1';
+const EASY_WRONG_KEY = 'future-intelligence-cbt-easy-wrong-v1';
+const EASY_SEEN_KEY = 'future-intelligence-cbt-easy-seen-v1';
+let easyBank = [], easyWrong = new Set(), easySeen = new Set(), usingEasy = false, easyError = '';
+const EXAM_KEYWORDS = [9,5,3,2,4,7].flatMap((count,i) => Array.from({length:count},(_,j) => `${i+2}-${j+1}`));
+function selectedEasy() { return ['easy','easyWrong'].includes($('mode').value); }
+function activeWrong() { return usingEasy ? easyWrong : wrong; }
 let bank = [], wrong = new Set(), session = [], current = 0, correct = 0, graded = false, picked = null, sessionLabel = '', isStudy = false, ordered = false, progressKey = '', saved = {index:0, done:{}};
 function shuffle(items) {
   const copy = [...items];
@@ -112,7 +119,33 @@ function saveWrong() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...wrong])); }
   catch (_) { notifyStorage('오답 기록을 저장하지 못했습니다. 현재 창에서는 유지되지만, 새로고침하거나 닫으면 사라질 수 있습니다.'); }
 }
+function loadEasyRecords() {
+  const known = new Set(easyBank.map(q => q.id));
+  for (const key of [EASY_WRONG_KEY, EASY_SEEN_KEY]) {
+    try {
+      const ids = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string')) throw new Error('invalid');
+      const clean = new Set(ids.filter(id => known.has(id)));
+      if (key === EASY_WRONG_KEY) easyWrong = clean; else easySeen = clean;
+    } catch (_) { notifyStorage('교수님 예시 난이도의 일부 기록을 읽지 못했습니다. 기존 문제은행 기록은 유지됩니다.'); }
+  }
+}
+function saveEasyRecord(key, values) {
+  try { localStorage.setItem(key, JSON.stringify([...values])); }
+  catch (_) { notifyStorage('교수님 예시 난이도 기록을 저장하지 못했습니다. 현재 창에서는 학습을 계속할 수 있습니다.'); }
+}
+function sampleEasyRound() {
+  const round = EXAM_KEYWORDS.map(keyword => {
+    const group = easyBank.filter(q => q.keyword === keyword);
+    let fresh = group.filter(q => !easySeen.has(q.id));
+    if (!fresh.length) { group.forEach(q => easySeen.delete(q.id)); fresh = group; }
+    return shuffle(fresh)[0];
+  });
+  return shuffle(round);
+}
 function pool() {
+  if ($('mode').value === 'easy') return easyBank;
+  if ($('mode').value === 'easyWrong') return easyBank.filter(q => easyWrong.has(q.id));
   if ($('mode').value === 'wrong') return bank.filter(q => wrong.has(q.id));
   if ($('mode').value === 'week') return bank.filter(q => q.week === Number($('week').value));
   return bank;
@@ -124,6 +157,12 @@ function saveProgress() {
   catch (_) { notifyStorage('진도를 저장하지 못했습니다. 현재 창을 닫으면 순서대로 풀기 진행 위치가 사라질 수 있습니다.'); }
 }
 function resetProgress() {
+  if (selectedEasy()) {
+    if (!confirm('교수님 예시 난이도의 출제 순환 기록을 초기화할까요? 오답과 기존 문제은행의 진도는 유지됩니다.')) return;
+    try { localStorage.removeItem(EASY_SEEN_KEY); easySeen.clear(); updateHome(); }
+    catch (_) { notifyStorage('출제 순환 기록을 초기화하지 못했습니다.'); }
+    return;
+  }
   if (!confirm('모든 범위의 풀이·학습 완료 기록과 이어 풀기 위치를 초기화할까요? 오답 기록은 유지됩니다.')) return;
   try {
     for (const scope of ['all', 'wrong', 'week2', 'week3', 'week4', 'week5', 'week6', 'week7']) {
@@ -153,24 +192,33 @@ function moveTo(index) {
 function updateHome() {
   $('weekField').hidden = $('mode').value !== 'week';
   const count = pool().length;
+  const easy = selectedEasy();
+  $('order').disabled = easy;
+  $('resetProgress').textContent = easy ? '교수님 예시 출제 기록 초기화' : '풀이 기록 초기화';
   const key = `${scopeKey()}-${$('studyMode').value}`;
   let completed = 0;
   try { const data = JSON.parse(localStorage.getItem(PROGRESS_KEY + '-' + key) || 'null'); completed = pool().filter(q => Object.hasOwn(data?.done || {},q.id)).length; } catch (_) {}
   $('scopeSummary').textContent = count ? $('order').value === 'ordered' ? `${count}문항 · 순서대로 풀기 · 완료 ${completed}문항` : `${count}문항 · 문제와 선택지 무작위` : '아직 오답이 없습니다. 전체 또는 주차별 문제를 풀어보세요.';
-  $('wrongCount').textContent = `남은 오답 ${wrong.size}문항`;
+  if (easy) $('scopeSummary').textContent = easyError || ($('mode').value === 'easy' ? `새 문제은행 ${easyBank.length}문항 · 30개 키워드에서 각 1문항 · 매회 무작위 추출. 키워드별 미학습 문항을 우선하고, 소진된 키워드는 다시 순환합니다. 실제 시험의 키워드별 출제 수를 예측하는 구성이 아닙니다.` : `${count}문항 · 교수님 예시 난이도 오답 복습 · 무작위`);
+  const selectedWrong = easy ? easyWrong : wrong;
+  $('wrongCount').textContent = `${easy ? '교수님 예시' : '기존 문제은행'} 남은 오답 ${selectedWrong.size}문항`;
   $('start').disabled = count === 0;
-  $('reset').disabled = wrong.size === 0;
+  $('reset').disabled = selectedWrong.size === 0;
+  if (easy && easyError) $('start').disabled = true;
 }
 function showHome() {
   $('home').hidden = false; $('quiz').hidden = true; $('result').hidden = true;
   session = []; updateHome(); $('start').focus();
 }
 function startSession() {
-  ordered = $('order').value === 'ordered';
-  session = ordered ? pool() : shuffle(pool());
+  usingEasy = selectedEasy();
+  if (usingEasy && easyError) return;
+  ordered = !usingEasy && $('order').value === 'ordered';
+  session = $('mode').value === 'easy' ? sampleEasyRound() : ordered ? pool() : shuffle(pool());
   if (!session.length) return;
   isStudy = $('studyMode').value === 'study';
   sessionLabel = $('mode').value === 'all' ? '전체 문제' : $('mode').value === 'wrong' ? '오답 복습' : `${$('week').value}주차`;
+  if (usingEasy) sessionLabel = $('mode').value === 'easy' ? '교수님 예시 난이도' : '교수님 예시 오답 복습';
   progressKey = `${scopeKey()}-${$('studyMode').value}`;
   saved = {index:0, done:{}};
   if (ordered) loadProgress();
@@ -218,8 +266,9 @@ function checkAnswer(event) {
   event.preventDefault();
   if (isStudy || graded || picked === null || !session.length) return;
   const q = session[current], isCorrect = picked === q.answer;
-  if (isCorrect) { correct++; wrong.delete(q.id); } else wrong.add(q.id);
-  saveWrong();
+  const mistakes = activeWrong();
+  if (isCorrect) { correct++; mistakes.delete(q.id); } else mistakes.add(q.id);
+  if (usingEasy) saveEasyRecord(EASY_WRONG_KEY, easyWrong); else saveWrong();
   if (ordered) { saved.done[q.id] = picked; saveProgress(); }
   showAnswer(isCorrect);
 }
@@ -227,6 +276,7 @@ function showAnswer(isCorrect) {
   if (graded || !session.length) return;
   graded = true;
   const q = session[current];
+  if (usingEasy) { easySeen.add(q.id); saveEasyRecord(EASY_SEEN_KEY, easySeen); }
   if (ordered && isStudy && !Object.hasOwn(saved.done,q.id)) { saved.done[q.id] = picked; saveProgress(); }
   $('choices').querySelectorAll('input').forEach(radio => {
     radio.disabled = true;
@@ -258,7 +308,7 @@ function nextQuestion() {
   $('quiz').hidden = true; $('result').hidden = false;
   $('resultScope').textContent = `${sessionLabel} · ${session.length}문항 완료`;
   $('resultScore').textContent = isStudy ? `${session.length}문항 학습` : `${correct} / ${session.length}`;
-  $('resultDetail').textContent = isStudy ? '학습 모드에서는 오답 기록이 변경되지 않았습니다.' : `이번 세션 오답 ${session.length - correct}문항 · 전체 남은 오답 ${wrong.size}문항`;
+  $('resultDetail').textContent = isStudy ? '학습 모드에서는 오답 기록이 변경되지 않았습니다.' : `이번 세션 오답 ${session.length - correct}문항 · 해당 문제은행 남은 오답 ${activeWrong().size}문항`;
   $('resultTitle').focus();
 }
 $('mode').addEventListener('change', updateHome); $('week').addEventListener('change', updateHome); $('order').addEventListener('change', updateHome); $('studyMode').addEventListener('change', updateHome);
@@ -268,17 +318,26 @@ $('jumpNumber').addEventListener('keydown', event => { if (event.key === 'Enter'
 $('start').addEventListener('click', startSession); $('answerForm').addEventListener('submit', checkAnswer); $('reveal').addEventListener('click', () => { if (isStudy) showAnswer(null); }); $('next').addEventListener('click', nextQuestion);
 $('back').addEventListener('click', showHome);
 $('quit').addEventListener('click', () => { if (confirm('현재 학습을 종료할까요? 이미 채점한 오답 기록은 유지됩니다.')) showHome(); });
-$('reset').addEventListener('click', () => { if (wrong.size && confirm('저장된 오답 기록을 모두 초기화할까요?')) { wrong.clear(); saveWrong(); updateHome(); } });
+$('reset').addEventListener('click', () => { const easy = selectedEasy(), mistakes = easy ? easyWrong : wrong; if (mistakes.size && confirm(`${easy ? '교수님 예시 난이도' : '기존 문제은행'}의 오답 기록을 초기화할까요?`)) { mistakes.clear(); if (easy) saveEasyRecord(EASY_WRONG_KEY, easyWrong); else saveWrong(); updateHome(); } });
 $('resetProgress').addEventListener('click', resetProgress);
 try {
   if (typeof QUESTIONS === 'undefined' || !Array.isArray(QUESTIONS) || !QUESTIONS.length) throw new Error('문제은행을 불러오지 못했습니다. index.html과 questions.js를 같은 폴더에 두세요.');
+  function validateBank(questions) {
   const ids = new Set();
-  for (const q of QUESTIONS) {
+  for (const q of questions) {
     if (typeof q.id !== 'string' || !q.id || ids.has(q.id) || !Number.isInteger(q.week) || q.week < 2 || q.week > 7 || typeof q.keyword !== 'string' || !q.keyword.startsWith(`${q.week}-`) || typeof q.question !== 'string' || !q.question.trim() || !Array.isArray(q.choices) || q.choices.length !== 5 || new Set(q.choices).size !== 5 || q.choices.some(c => typeof c !== 'string' || !c.trim()) || !Array.isArray(q.choiceExplanations) || q.choiceExplanations.length !== 5 || q.choiceExplanations.some(c => typeof c !== 'string' || !c.trim()) || !Number.isInteger(q.answer) || q.answer < 0 || q.answer > 4 || typeof q.explanation !== 'string' || !q.explanation.trim() || !Number.isInteger(q.sourcePage) || q.sourcePage < 1 || (q.image && !/^data:image\/png;base64,/.test(q.image))) throw new Error(`문제은행 형식을 확인해 주세요: ${q.id || 'ID 없음'}`);
     ids.add(q.id);
   }
+  }
+  validateBank(QUESTIONS);
   bank = QUESTIONS; loadWrong();
-  $('bankSummary').textContent = `총 ${bank.length}문항 · ${new Set(bank.map(q => q.keyword)).size}개 키워드 반영`;
+  try {
+    if (typeof EASY_QUESTIONS === 'undefined' || !Array.isArray(EASY_QUESTIONS)) throw new Error('easy_questions.js를 불러오지 못했습니다.');
+    validateBank(EASY_QUESTIONS);
+    if (EASY_QUESTIONS.some(q => !q.id.startsWith('easy-') || !EXAM_KEYWORDS.includes(q.keyword)) || EXAM_KEYWORDS.some(k => !EASY_QUESTIONS.some(q => q.keyword === k))) throw new Error('새 문제은행의 30개 키워드를 확인해 주세요.');
+    easyBank = EASY_QUESTIONS; loadEasyRecords();
+  } catch (error) { easyError = '교수님 예시 난이도를 불러오지 못했습니다: ' + error.message; }
+  $('bankSummary').textContent = `기존 ${bank.length}문항 + 교수님 예시 난이도 ${easyBank.length}문항 · 30개 키워드`;
   updateHome();
 } catch (error) {
   $('fatal').textContent = error.message; $('fatal').hidden = false; $('home').hidden = true;
