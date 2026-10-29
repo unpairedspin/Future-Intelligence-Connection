@@ -64,6 +64,8 @@
 <button id="start" class="primary" style="width:100%" disabled>학습 시작</button>
 <div class="actions"><span id="wrongCount" class="small muted"></span><button id="reset" class="text-button" disabled>오답 기록 초기화</button></div>
 <button id="resetProgress" class="text-button" type="button">풀이 기록 초기화</button>
+<div class="actions" aria-label="문제은행별 오답 내보내기"><button id="exportWrong" type="button" disabled>기존 문제은행 오답 .md</button><button id="exportEasyWrong" type="button" disabled>교수님 예시 오답 .md</button></div>
+<p class="small muted">현재 오답 목록을 문제·정답·해설과 함께 저장합니다. 다시 맞혀 목록에서 제거된 문항은 제외됩니다.</p>
 <details><summary>사용 방법과 기록 안내</summary><p>문제 풀이에서는 답을 고른 뒤 <strong>정답 확인</strong>으로 채점합니다. 학습 모드는 선택 없이도 정답과 선택지별 해설을 볼 수 있고 오답 기록을 바꾸지 않습니다. 순서대로 풀기는 범위와 진행 방식별 위치·풀이 결과를 저장하며 문항 이동이 가능합니다. 무작위로 풀기는 시작할 때 문제와 선택지를 섞습니다.</p><p>틀린 문제는 오답에 남고 다시 맞히면 제거됩니다. 오답 기록과 순서대로 풀기의 진도는 현재 브라우저에 저장됩니다. 비공개 모드·브라우저 데이터 삭제 시 기록이 사라질 수 있습니다.</p><p>오프라인 사용: 압축을 풀고 index.html과 questions.js를 같은 폴더에 둔 뒤 index.html을 브라우저로 여세요. 교수님 예시 난이도에는 easy_questions.js도 같은 폴더에 두세요. PDF 보기에는 함께 제공된 materials 폴더를 사용합니다. 파일 위치나 브라우저가 바뀌면 기록이 이어지지 않을 수 있습니다.</p></details>
 </section>
 <section id="quiz" class="card" hidden>
@@ -190,6 +192,10 @@ function moveTo(index) {
   current = index; saved.index = index; saveProgress(); renderQuestion();
 }
 function updateHome() {
+  $('exportWrong').disabled = wrong.size === 0;
+  $('exportEasyWrong').disabled = easyWrong.size === 0;
+  $('exportWrong').textContent = `기존 문제은행 오답 .md (${wrong.size})`;
+  $('exportEasyWrong').textContent = `교수님 예시 오답 .md (${easyWrong.size})`;
   $('weekField').hidden = $('mode').value !== 'week';
   const count = pool().length;
   const easy = selectedEasy();
@@ -320,6 +326,41 @@ $('start').addEventListener('click', startSession); $('answerForm').addEventList
 $('back').addEventListener('click', showHome);
 $('quit').addEventListener('click', () => { if (confirm('현재 학습을 종료할까요? 이미 채점한 오답 기록은 유지됩니다.')) showHome(); });
 $('reset').addEventListener('click', () => { const easy = selectedEasy(), mistakes = easy ? easyWrong : wrong; if (mistakes.size && confirm(`${easy ? '교수님 예시 난이도' : '기존 문제은행'}의 오답 기록을 초기화할까요?`)) { mistakes.clear(); if (easy) saveEasyRecord(EASY_WRONG_KEY, easyWrong); else saveWrong(); updateHome(); } });
+function wrongMarkdown(questions, title) {
+  const text = value => String(value).replace(/\\/g, '\\\\').replace(/([`*_[\]<>#])/g, '\\$1').replace(/\r?\n/g, '  \n');
+  const lines = [`# 미래 지능 연결 — ${title} 오답 모음`, '', `총 ${questions.length}문항 · 현재 오답 목록 기준`, '', '다시 맞혀 오답 목록에서 제거된 문항은 포함하지 않습니다.', '선택지 번호는 문제은행의 원래 순서이며, 풀이 화면에서 섞인 번호와 다를 수 있습니다.', ''];
+  questions.forEach((q, index) => {
+    lines.push(`## ${index + 1}. ${q.id}`, '', `${q.week}주차 · 키워드 ${q.keyword} · PDF ${q.sourcePage}쪽`, '', text(q.question), '');
+    if (q.image) lines.push(`![문제 그림](${new URL(q.image, document.baseURI).href})`, '', '그림이 표시되지 않는 뷰어에서는 아래 원본 PDF의 해당 페이지를 확인하세요.', '');
+    q.choices.forEach((choice, i) => lines.push(`${i + 1}. ${text(choice)}`));
+    lines.push('', `**정답: ${q.answer + 1}번 — ${text(q.choices[q.answer])}**`, '', text(q.explanation), '', '### 선택지별 해설', '');
+    q.choiceExplanations.forEach((note, i) => lines.push(`${i + 1}. **${text(q.choices[i])}**: ${text(note)}`));
+    const source = new URL(`materials/week${String(q.week).padStart(2, '0')}.pdf#page=${q.sourcePage}`, document.baseURI).href;
+    lines.push('', `[원본 PDF ${q.sourcePage}쪽](${source})`, '', '---', '');
+  });
+  return lines.join('\n');
+}
+function exportWrong(easy) {
+  const mistakes = easy ? easyWrong : wrong;
+  const questions = (easy ? easyBank : bank).filter(q => mistakes.has(q.id));
+  if (!questions.length) return;
+  let url;
+  try {
+    const title = easy ? '교수님 예시 난이도' : '기존 문제은행';
+    const markdown = wrongMarkdown(questions, title);
+    url = URL.createObjectURL(new Blob(['\uFEFF', markdown], {type:'text/markdown;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `미래지능연결_${easy ? '교수님예시' : '기존154'}_오답_${new Date().toLocaleDateString('sv-SE')}.md`;
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (_) {
+    if (url) URL.revokeObjectURL(url);
+    notifyStorage('오답 파일을 다운로드하지 못했습니다. 브라우저의 다운로드 허용 설정을 확인해 주세요.');
+  }
+}
+$('exportWrong').addEventListener('click', () => exportWrong(false));
+$('exportEasyWrong').addEventListener('click', () => exportWrong(true));
 $('resetProgress').addEventListener('click', resetProgress);
 try {
   if (typeof QUESTIONS === 'undefined' || !Array.isArray(QUESTIONS) || !QUESTIONS.length) throw new Error('문제은행을 불러오지 못했습니다. index.html과 questions.js를 같은 폴더에 두세요.');
