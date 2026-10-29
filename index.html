@@ -55,7 +55,7 @@
 <section id="home" class="card">
 <p class="intro">문제를 풀고, 틀린 내용만 다시 확인하세요.<br><span id="bankSummary" class="muted small"></span></p>
 <div class="form-row">
-<label class="field">학습 범위<select id="mode"><option value="all">전체 문제 풀기</option><option value="week">특정 주차 문제 풀기</option><option value="wrong">오답만 풀기</option><option value="easy">교수님 예시 난이도 · 30문항</option><option value="easyWrong">교수님 예시 난이도 · 오답 복습</option></select></label>
+<label class="field">학습 범위<select id="mode"><option value="all">전체 문제 풀기</option><option value="week">특정 주차 문제 풀기</option><option value="wrong">오답만 풀기</option><option value="easy">교수님 예시 난이도 · 30문항</option><option value="easyAll">교수님 예시 난이도 · 전체 233문항</option><option value="easyWrong">교수님 예시 난이도 · 오답 복습</option></select></label>
 <label id="weekField" class="field" hidden>주차<select id="week"><option value="2">2주차</option><option value="3">3주차</option><option value="4">4주차</option><option value="5">5주차</option><option value="6">6주차</option><option value="7">7주차</option></select></label>
 </div>
 <label class="field">진행 방식<select id="studyMode"><option value="quiz">문제 풀이</option><option value="study">학습 모드</option></select></label>
@@ -91,7 +91,7 @@ const EASY_WRONG_KEY = 'future-intelligence-cbt-easy-wrong-v1';
 const EASY_SEEN_KEY = 'future-intelligence-cbt-easy-seen-v1';
 let easyBank = [], easyWrong = new Set(), easySeen = new Set(), usingEasy = false, easyError = '';
 const EXAM_KEYWORDS = [9,5,3,2,4,7].flatMap((count,i) => Array.from({length:count},(_,j) => `${i+2}-${j+1}`));
-function selectedEasy() { return ['easy','easyWrong'].includes($('mode').value); }
+function selectedEasy() { return ['easy','easyAll','easyWrong'].includes($('mode').value); }
 function activeWrong() { return usingEasy ? easyWrong : wrong; }
 let bank = [], wrong = new Set(), session = [], current = 0, correct = 0, graded = false, picked = null, sessionLabel = '', isStudy = false, ordered = false, progressKey = '', saved = {index:0, done:{}};
 function shuffle(items) {
@@ -144,7 +144,7 @@ function sampleEasyRound() {
   return shuffle(round);
 }
 function pool() {
-  if ($('mode').value === 'easy') return easyBank;
+  if (['easy','easyAll'].includes($('mode').value)) return easyBank;
   if ($('mode').value === 'easyWrong') return easyBank.filter(q => easyWrong.has(q.id));
   if ($('mode').value === 'wrong') return bank.filter(q => wrong.has(q.id));
   if ($('mode').value === 'week') return bank.filter(q => q.week === Number($('week').value));
@@ -200,7 +200,7 @@ function updateHome() {
   let completed = 0;
   try { const data = JSON.parse(localStorage.getItem(PROGRESS_KEY + '-' + key) || 'null'); completed = pool().filter(q => Object.hasOwn(data?.done || {},q.id)).length; } catch (_) {}
   $('scopeSummary').textContent = count ? $('order').value === 'ordered' ? `${count}문항 · 순서대로 풀기 · 완료 ${completed}문항` : `${count}문항 · 문제와 선택지 무작위` : '아직 오답이 없습니다. 전체 또는 주차별 문제를 풀어보세요.';
-  if (easy) $('scopeSummary').textContent = easyError || ($('mode').value === 'easy' ? `새 문제은행 ${easyBank.length}문항 · 30개 키워드에서 각 1문항 · 매회 무작위 추출. 키워드별 미학습 문항을 우선하고, 소진된 키워드는 다시 순환합니다. 실제 시험의 키워드별 출제 수를 예측하는 구성이 아닙니다.` : `${count}문항 · 교수님 예시 난이도 오답 복습 · 무작위`);
+  if (easy) $('scopeSummary').textContent = easyError || ($('mode').value === 'easy' ? `새 문제은행 ${easyBank.length}문항 · 30개 키워드에서 각 1문항 · 매회 무작위 추출. 키워드별 미학습 문항을 우선하고, 소진된 키워드는 다시 순환합니다. 실제 시험의 키워드별 출제 수를 예측하는 구성이 아닙니다.` : $('mode').value === 'easyAll' ? `${count}문항 전체 · 한 번씩 출제 · 문제와 선택지 무작위` : `${count}문항 · 교수님 예시 난이도 오답 복습 · 무작위`);
   const selectedWrong = easy ? easyWrong : wrong;
   $('wrongCount').textContent = `${easy ? '교수님 예시' : '기존 문제은행'} 남은 오답 ${selectedWrong.size}문항`;
   $('start').disabled = count === 0;
@@ -219,7 +219,7 @@ function startSession() {
   if (!session.length) return;
   isStudy = $('studyMode').value === 'study';
   sessionLabel = $('mode').value === 'all' ? '전체 문제' : $('mode').value === 'wrong' ? '오답 복습' : `${$('week').value}주차`;
-  if (usingEasy) sessionLabel = $('mode').value === 'easy' ? '교수님 예시 난이도' : '교수님 예시 오답 복습';
+  if (usingEasy) sessionLabel = $('mode').value === 'easy' ? '교수님 예시 난이도' : $('mode').value === 'easyAll' ? '교수님 예시 전체' : '교수님 예시 오답 복습';
   progressKey = `${scopeKey()}-${$('studyMode').value}`;
   saved = {index:0, done:{}};
   if (ordered) loadProgress();
