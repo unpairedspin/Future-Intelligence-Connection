@@ -59,7 +59,7 @@
 <label id="weekField" class="field" hidden>주차<select id="week"><option value="2">2주차</option><option value="3">3주차</option><option value="4">4주차</option><option value="5">5주차</option><option value="6">6주차</option><option value="7">7주차</option></select></label>
 </div>
 <label class="field">진행 방식<select id="studyMode"><option value="quiz">문제 풀이</option><option value="study">학습 모드</option></select></label>
-<label class="field">문제 순서<select id="order"><option value="ordered">순서대로 풀기</option><option value="random">무작위로 풀기</option></select></label>
+<label id="orderField" class="field">문제 순서<select id="order"><option value="ordered">순서대로 풀기</option><option value="random">무작위로 풀기</option></select></label>
 <p id="scopeSummary" class="muted small" aria-live="polite"></p>
 <button id="start" class="primary" style="width:100%" disabled>학습 시작</button>
 <div class="actions"><span id="wrongCount" class="small muted"></span><button id="reset" class="text-button" disabled>오답 기록 초기화</button></div>
@@ -194,6 +194,7 @@ function updateHome() {
   const count = pool().length;
   const easy = selectedEasy();
   $('order').disabled = easy;
+  $('orderField').hidden = easy;
   $('resetProgress').textContent = easy ? '교수님 예시 출제 기록 초기화' : '풀이 기록 초기화';
   const key = `${scopeKey()}-${$('studyMode').value}`;
   let completed = 0;
